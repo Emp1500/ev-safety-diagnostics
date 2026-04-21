@@ -1,0 +1,29 @@
+ Title of project is EV Safety and Diagnostics
+
+ HOME
+  - Hero banner
+    - HLS video background, glow ellipse, LiquidGlass card, headline, CTA button
+  - Fleet summary cards (×3)
+	what pros of this like (40% reduced up-time)
+  - Two buttons:
+	one for know more( we'll add information about motives) and other for (stats)
+  - Add few SVGS or logos of electric vehicle companies
+
+  STATS
+  - Vehicle name and id(card)
+  - Time card
+  - Stat cards (×6)
+    - Battery, Current, Temperature, Tire Pressure, Speed, G-Force
+  - Charts grid (×7)
+    - Speed, Battery + Temperature (50/50), G-Force + Accelerometer XYZ (50/50), Tire Pressure + Current Bar (25/75) arranged properly and clutter free
+  - Incident map (full width) with good design and
+    - Crash pins, click-to-popup, crash events table below
+
+  PRICING
+  - Page header
+    - Title and subtitle centered
+  - Pricing cards (×3)
+    - Basic, Pro (highlighted), Enterprise (prices in INR)
+
+ Footer
+  -@NLPC 2026        space       EV Safety and Diagnostics (add these details and change accordingly to make it look more professional and good)

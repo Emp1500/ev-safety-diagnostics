@@ -59,10 +59,13 @@ public class TelemetryService {
 
     public Page<TelemetryResponse> getHistory(String vin, OffsetDateTime from, OffsetDateTime to,
                                                int page, int size) {
-        Vehicle vehicle = vehicleRepository.findByVin(vin)
-                .orElseThrow(() -> new IllegalArgumentException("Vehicle not found: " + vin));
-
         PageRequest pageable = PageRequest.of(page, size, Sort.by("recordedAt").descending());
+
+        Optional<Vehicle> vehicleOpt = vehicleRepository.findByVin(vin);
+        if (vehicleOpt.isEmpty()) {
+            return Page.empty(pageable);
+        }
+        Vehicle vehicle = vehicleOpt.get();
 
         if (from != null && to != null) {
             return telemetryRepository.findByVehicleAndRecordedAtBetween(vehicle, from, to, pageable)

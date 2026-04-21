@@ -1,0 +1,204 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Reset & Base ─────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #050908;
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0a0f0d; }
+::-webkit-scrollbar-thumb { background: #1e3d30; border-radius: 3px; }
+
+/* ── Hero Grid Lines ──────────────────────────────────────── */
+.grid-line {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+/* ── Navigation ───────────────────────────────────────────── */
+.nav-link {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: color 0.2s;
+  cursor: pointer;
+}
+.nav-link:hover, .nav-link.active { color: #5ed29c; }
+
+/* ── Buttons ──────────────────────────────────────────────── */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 28px;
+  border-radius: 9999px;
+  background: #5ed29c;
+  color: #050908;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.2s, opacity 0.2s;
+}
+.btn-primary:hover { opacity: 0.85; transform: scale(1.03); }
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  border-radius: 9999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.btn-outline:hover { border-color: #5ed29c; color: #5ed29c; }
+
+/* ── Cards ────────────────────────────────────────────────── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, rgba(94, 210, 156, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(94, 210, 156, 0.15);
+  border-radius: 16px;
+  padding: 24px;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.stat-card:hover { border-color: rgba(94, 210, 156, 0.4); transform: translateY(-2px); }
+
+/* ── Chart Container ──────────────────────────────────────── */
+.chart-box {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+/* ── Pricing Cards ────────────────────────────────────────── */
+.price-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 36px 28px;
+  transition: transform 0.2s;
+}
+.price-card:hover { transform: translateY(-4px); }
+.price-card.featured {
+  background: rgba(94, 210, 156, 0.06);
+  border-color: rgba(94, 210, 156, 0.35);
+}
+
+/* ── Mobile Menu Overlay ──────────────────────────────────── */
+.mobile-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(5, 9, 8, 0.97);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 36px;
+}
+.mobile-overlay span {
+  color: white;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: color 0.2s;
+}
+.mobile-overlay span:hover { color: #5ed29c; }
+
+/* ── Incident Table ───────────────────────────────────────── */
+.inc-table { width: 100%; border-collapse: collapse; }
+.inc-table th {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 10px 16px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.inc-table td {
+  padding: 12px 16px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.inc-table tr:last-child td { border-bottom: none; }
+
+/* ── Severity Badges ──────────────────────────────────────── */
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+.badge-critical { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+.badge-high     { background: rgba(249,115,22,0.15); color: #fb923c; border: 1px solid rgba(249,115,22,0.3); }
+.badge-medium   { background: rgba(234,179,8,0.15);  color: #facc15; border: 1px solid rgba(234,179,8,0.3); }
+
+/* ── Leaflet Dark Theme Overrides ─────────────────────────── */
+.leaflet-container { background: #0a0f0d !important; border-radius: 14px; }
+.leaflet-popup-content-wrapper {
+  background: #0f1f18;
+  border: 1px solid rgba(94, 210, 156, 0.3);
+  border-radius: 10px;
+  color: white;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+.leaflet-popup-tip { background: #0f1f18; }
+
+/* ── Section Labels & Dividers ────────────────────────────── */
+.section-label {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  color: #5ed29c;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.section-divider {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(94, 210, 156, 0.2), transparent);
+}
+
+/* ── Hero fallback pulse animation ───────────────────────── */
+@keyframes heroPulse {
+  0%   { opacity: 0.55; }
+  100% { opacity: 1; }
+}

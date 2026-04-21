@@ -1,269 +1,168 @@
-# EV Safety & Diagnostics Backend
+# NLPC EV Safety & Diagnostics System — Session Handoff
 
-A Spring Boot backend for the **IoT-Based Electric Vehicle Safety and Diagnostics System** — built for NLPC-2026. Ingests real-time sensor data from an ESP32 microcontroller via MQTT, persists it to PostgreSQL, and serves it to a React dashboard via REST API and WebSocket.
-
----
-
-## Table of Contents
-
-- [System Overview](#system-overview)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Prerequisites](#prerequisites)
-- [Getting Started](#getting-started)
-- [Configuration](#configuration)
-- [Database Schema](#database-schema)
-- [MQTT Topics & Payload](#mqtt-topics--payload)
-- [API Reference](#api-reference)
-- [WebSocket](#websocket)
-- [Build Phases](#build-phases)
-- [Team](#team)
+**Project:** IoT-Based Electric Vehicle Safety and Diagnostics System (NLPC-2026)
+**Stack:** ESP32 → MQTT → Spring Boot 3.2.5 → PostgreSQL → React 18 Dashboard
+**Environment:** Windows 11 + WSL2. Backend runs on Windows; frontend runs in WSL2 or Windows.
 
 ---
 
-## System Overview
-
-```
-ESP32 (sensors)
-    │
-    │  MQTT publish  →  ev/{vehicleId}/telemetry
-    ▼
-Mosquitto Broker  (localhost:1883)
-    │
-    │  subscribe
-    ▼
-Spring Boot Backend
-    ├── TelemetryService  →  PostgreSQL (persist readings)
-    ├── CrashDetection    →  CrashEvent table (g-force > 12 m/s²)
-    ├── REST API          →  /api/v1/**  (historical data)
-    └── WebSocket STOMP   →  /topic/live/{vehicleId}  (live push)
-                                        │
-                                        ▼
-                              React Frontend (Antigravity)
-                              Live dashboard + charts
-```
-
-### Hardware Sensors (ESP32)
-
-| Sensor | Measurement |
-|--------|-------------|
-| INA219 | Battery voltage, current (mA) |
-| LM35 | Motor temperature (°C) |
-| HX710B | Tire pressure (bar) |
-| Hall Effect | Vehicle speed (km/h) |
-| ADXL345 | 3-axis acceleration + G-force |
-| SIM808 | GPS coordinates (for crash events) |
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Framework | Spring Boot 3.x |
-| Build tool | Maven |
-| Database | PostgreSQL 15+ |
-| Migrations | Flyway |
-| MQTT client | Eclipse Paho via Spring Integration |
-| Real-time | Spring WebSocket (STOMP) |
-| ORM | Spring Data JPA (Hibernate) |
-| Utilities | Lombok |
-
----
-
-## Project Structure
-
-```
-ev-safety-backend/
-├── pom.xml
-└── src/
-    └── main/
-        ├── java/com/evdiag/
-        │   ├── EvSafetyApplication.java
-        │   ├── config/
-        │   │   ├── MqttConfig.java            # Mosquitto connection + channel setup
-        │   │   └── WebSocketConfig.java        # STOMP endpoint registration
-        │   ├── domain/
-        │   │   └── entity/
-        │   │       ├── Vehicle.java            # Vehicle registration info
-        │   │       ├── TelemetryReading.java   # Sensor snapshot per publish cycle
-        │   │       └── CrashEvent.java         # Crash/threshold breach records
-        │   ├── mqtt/
-        │   │   ├── MqttSubscriber.java         # Listens on ev/+/telemetry
-        │   │   └── MqttMessageParser.java      # Deserializes JSON payload
-        │   ├── service/
-        │   │   └── TelemetryService.java       # Validate, persist, detect crash, broadcast
-        │   ├── controller/
-        │   │   ├── TelemetryController.java    # REST endpoints for telemetry data
-        │   │   └── CrashEventController.java   # REST endpoints for crash events
-        │   ├── repository/
-        │   │   ├── TelemetryRepository.java
-        │   │   └── CrashEventRepository.java
-        │   └── websocket/
-        │       └── TelemetryBroadcaster.java   # Pushes live data to /topic/live/{vehicleId}
-        └── resources/
-            ├── application.yml
-            └── db/migration/
-                ├── V1__create_vehicle.sql
-                ├── V2__create_telemetry_reading.sql
-                └── V3__create_crash_event.sql
-```
-
----
-
-## Prerequisites
-
-Make sure you have the following installed:
-
-- **Java 17+** — `java -version`
-- **Maven 3.8+** — `mvn -version`
-- **PostgreSQL 15+** — running locally or via Docker
-- **Mosquitto MQTT broker** — running on port `1883`
-
-### Quick setup with Docker (optional)
+## Quick Start (Every Session)
 
 ```bash
-# PostgreSQL
-docker run -d \
-  --name ev-postgres \
-  -e POSTGRES_DB=evdiag \
-  -e POSTGRES_USER=evuser \
-  -e POSTGRES_PASSWORD=evpass \
-  -p 5432:5432 \
-  postgres:15
+# 1. Start PostgreSQL (if not running as a service)
+#    DB: evdiag | user: evuser | pass: evpass | port: 5432
 
-# Mosquitto MQTT
-docker run -d \
-  --name ev-mosquitto \
-  -p 1883:1883 \
-  eclipse-mosquitto
-```
+# 2. Start Mosquitto MQTT broker (port 1883)
+net start mosquitto          # Windows PowerShell (admin)
 
----
-
-## Getting Started
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/your-org/ev-safety-backend.git
+# 3. Start backend
 cd ev-safety-backend
+mvn spring-boot:run          # http://localhost:8080
 
-# 2. Configure environment (see Configuration section)
-cp src/main/resources/application.yml.example src/main/resources/application.yml
+# 4. Start frontend
+cd ev-safety-frontend
+npm run dev                  # http://localhost:5173
 
-# 3. Build the project
-mvn clean install
-
-# 4. Run the application
-mvn spring-boot:run
+# 5. Browser → http://localhost:5173/stats
 ```
 
-Flyway will automatically create all database tables on first startup.
-
-Verify the app is running:
-
+Verify backend is alive:
 ```bash
 curl http://localhost:8080/api/v1/vehicles
 ```
 
 ---
 
-## Configuration
+## Full Data Flow
 
-Edit `src/main/resources/application.yml`:
+```
+ESP32 (sensors)
+  │  publishes JSON every 500 ms
+  │  Topic: ev/{vehicleId}/telemetry  (port 1883)
+  ▼
+Mosquitto MQTT Broker  (localhost:1883)
+  │  Spring Integration subscribes: ev/+/telemetry
+  ▼
+MqttSubscriber.handleMessage()
+  │  MqttMessageParser.parse() → TelemetryPayload
+  ▼
+TelemetryService.process()
+  ├─ 1. vehicleRepository.findByVin() — auto-registers if new VIN
+  ├─ 2. telemetryRepository.save(reading) ← SAVED TO DB FIRST
+  ├─ 3. if gForce > 12.0 → crashEventRepository.save(crashEvent)
+  └─ 4. TelemetryBroadcaster.broadcast() → WebSocket /topic/live/{vin}
+                                                │
+                        ┌───────────────────────┤
+                        │ live (WS connected)   │ offline (WS down)
+                        ▼                       ▼
+               React updates charts      REST poll every 5s:
+               in real-time              GET /api/v1/telemetry/{vin}/latest
+                                         → shows last DB entry
+                                         → updates stat cards + charts
+```
 
-```yaml
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/evdiag
-    username: evuser
-    password: evpass
-    driver-class-name: org.postgresql.Driver
+**Key rule:** Data is always written to PostgreSQL before being broadcast. The frontend never reads from the ESP32 directly — only from the database (via REST or WebSocket).
 
-  jpa:
-    hibernate:
-      ddl-auto: validate        # Flyway handles schema, JPA only validates
-    show-sql: false
+---
 
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
+## Project Structure
 
-mqtt:
-  broker-url: tcp://localhost:1883
-  client-id: ev-safety-backend
-  topic: ev/+/telemetry          # + wildcard matches any vehicleId
-
-server:
-  port: 8080
-
-websocket:
-  endpoint: /ws
-  topic-prefix: /topic/live
+```
+NLPC Vehical Safety and Diagonistic/
+├── README.md                          ← this file
+├── ESP32_INTEGRATION.md               ← wiring guide + MQTT payload format
+├── .env                               ← DB + MQTT credentials (not committed)
+│
+├── ev-safety-backend/                 ← Spring Boot app
+│   ├── pom.xml
+│   ├── CLAUDE.md                      ← backend-specific dev guide
+│   └── src/main/java/com/evdiag/
+│       ├── config/
+│       │   ├── MqttConfig.java        ← Mosquitto adapter, subscribes ev/+/telemetry
+│       │   └── WebSocketConfig.java   ← STOMP endpoint /ws
+│       ├── mqtt/
+│       │   ├── MqttSubscriber.java    ← @ServiceActivator on mqttInputChannel
+│       │   └── MqttMessageParser.java ← JSON → TelemetryPayload (null on parse fail)
+│       ├── service/
+│       │   ├── TelemetryService.java  ← core: persist + crash detect + broadcast
+│       │   └── VehicleService.java    ← vehicle CRUD
+│       ├── controller/
+│       │   ├── TelemetryController.java   ← GET /latest, /history
+│       │   ├── CrashEventController.java  ← GET /crashes/{vin}
+│       │   └── VehicleController.java     ← GET+POST /vehicles
+│       ├── domain/entity/
+│       │   ├── Vehicle.java           ← id (UUID), name, vin, registered_at
+│       │   ├── TelemetryReading.java  ← all sensor fields + vehicle FK
+│       │   └── CrashEvent.java        ← lat/lng/gForcePeak + vehicle FK
+│       ├── repository/
+│       │   ├── TelemetryRepository.java   ← findTopByVehicle…Desc, findByVehicle…
+│       │   └── CrashEventRepository.java
+│       ├── websocket/
+│       │   └── TelemetryBroadcaster.java  ← SimpMessagingTemplate → /topic/live/{vin}
+│       └── resources/
+│           ├── application.yml
+│           └── db/migration/
+│               ├── V1__create_vehicle.sql
+│               ├── V2__create_telemetry_reading.sql
+│               └── V3__create_crash_event.sql
+│
+└── ev-safety-frontend/                ← React 18 + Vite + Tailwind
+    ├── vite.config.js                 ← proxy /api + /ws → localhost:8080
+    └── src/
+        ├── App.jsx                    ← router: /, /stats, /pricing
+        ├── services/
+        │   ├── api.js                 ← REST client (getVehicles, getLatestTelemetry, etc.)
+        │   └── websocket.js           ← STOMP/SockJS createLiveClient()
+        └── components/stats/
+            ├── StatsPage.jsx          ← main dashboard (vehicle select, cards, charts, map)
+            ├── IncidentMap.jsx        ← Leaflet map with crash markers
+            └── charts/
+                ├── LineChart.jsx
+                ├── BarChart.jsx
+                └── MultiLineChart.jsx
 ```
 
 ---
 
-## Database Schema
+## Database
 
-### `vehicle`
-```sql
-CREATE TABLE vehicle (
-    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name          VARCHAR(100) NOT NULL,
-    vin           VARCHAR(50)  UNIQUE,
-    registered_at TIMESTAMPTZ  DEFAULT NOW()
-);
-```
+**Connection:** `jdbc:postgresql://localhost:5432/evdiag`
+**Credentials:** `evuser / evpass`
+**Schema managed by Flyway** — never edit migration files, always add a new `V{n}__*.sql`.
 
-### `telemetry_reading`
-```sql
-CREATE TABLE telemetry_reading (
-    id                BIGSERIAL PRIMARY KEY,
-    vehicle_id        UUID        NOT NULL REFERENCES vehicle(id),
-    recorded_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    battery_voltage   NUMERIC(5,2),      -- INA219  (volts)
-    current_ma        NUMERIC(7,2),      -- INA219  (milliamps)
-    temperature_c     NUMERIC(5,2),      -- LM35    (celsius)
-    tire_pressure_bar NUMERIC(5,2),      -- HX710B  (bar)
-    speed_kmh         NUMERIC(5,2),      -- Hall sensor
-    accel_x           NUMERIC(6,3),      -- ADXL345 (m/s²)
-    accel_y           NUMERIC(6,3),
-    accel_z           NUMERIC(6,3),
-    g_force           NUMERIC(6,3)       -- resultant magnitude
-);
-```
-
-### `crash_event`
-```sql
-CREATE TABLE crash_event (
-    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    vehicle_id   UUID        NOT NULL REFERENCES vehicle(id),
-    latitude     NUMERIC(10,6),          -- SIM808 GPS
-    longitude    NUMERIC(10,6),
-    g_force_peak NUMERIC(6,3),
-    occurred_at  TIMESTAMPTZ DEFAULT NOW()
-);
-```
+| Table | Key columns | Notes |
+|-------|-------------|-------|
+| `vehicle` | `id` (UUID PK), `vin` (unique), `name`, `registered_at` | VIN is the external identifier everywhere |
+| `telemetry_reading` | `id` (bigserial), `vehicle_id` FK, `recorded_at`, all sensor fields | Auto-indexed on `(vehicle_id, recorded_at DESC)` |
+| `crash_event` | `id` (UUID), `vehicle_id` FK, `latitude`, `longitude`, `g_force_peak`, `occurred_at` | Created automatically when g-force > 12.0 |
 
 ---
 
-## MQTT Topics & Payload
+## API Reference
 
-### Topic format
+**Base URL:** `http://localhost:8080/api/v1`
+All endpoints have `@CrossOrigin(origins = "*")`.
 
-```
-ev/{vehicleId}/telemetry
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/vehicles` | List all registered vehicles |
+| POST | `/vehicles` | Register vehicle — body: `{"name":"...","vin":"..."}` |
+| GET | `/telemetry/{vin}/latest` | Most recent DB entry for VIN (404 if no readings) |
+| GET | `/telemetry/{vin}/history` | Paginated history — params: `from`, `to`, `page`, `size` |
+| GET | `/crashes/{vin}` | All crash events for VIN, sorted desc |
 
-Example: `ev/EV-001/telemetry`
+**Auto-registration:** If MQTT message arrives with an unknown VIN, `TelemetryService` automatically inserts a new `vehicle` row. You don't need to pre-register vehicles.
 
-### JSON payload (published by ESP32)
+---
+
+## MQTT Payload (ESP32 publishes this)
+
+**Topic:** `ev/{vehicleId}/telemetry`
 
 ```json
 {
   "vehicleId":       "EV-001",
-  "batteryVoltage":  48.3,
+  "batteryVoltage":  387.5,
   "currentMa":       1200.5,
   "temperatureC":    42.1,
   "tirePressureBar": 2.8,
@@ -277,130 +176,104 @@ Example: `ev/EV-001/telemetry`
 }
 ```
 
-> **Crash detection:** If `gForce > 12.0 m/s²`, the backend automatically creates a `crash_event` record with the GPS coordinates from the payload.
+**Test without ESP32 (PowerShell):**
+```powershell
+@'
+{"vehicleId":"EV-001","batteryVoltage":387.5,"currentMa":1200.5,"temperatureC":42.1,"tirePressureBar":2.4,"speedKmh":72.0,"accelX":0.1,"accelY":0.02,"accelZ":9.8,"gForce":1.0,"latitude":28.6139,"longitude":77.2090}
+'@ | Out-File -FilePath "C:\temp\payload.json" -Encoding UTF8 -NoNewline
 
----
-
-## API Reference
-
-Base URL: `http://localhost:8080/api/v1`
-
-### Vehicles
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/vehicles` | List all registered vehicles |
-| `GET` | `/vehicles/{id}` | Get vehicle by ID |
-| `POST` | `/vehicles` | Register a new vehicle |
-
-### Telemetry
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/telemetry/{vehicleId}/latest` | Latest sensor snapshot |
-| `GET` | `/telemetry/{vehicleId}/history` | Paginated historical readings |
-
-Query params for `/history`:
-
-```
-from     ISO datetime  e.g. 2026-04-01T00:00:00Z
-to       ISO datetime  e.g. 2026-04-11T23:59:59Z
-page     integer       default 0
-size     integer       default 20
-```
-
-Example:
-
-```bash
-GET /api/v1/telemetry/EV-001/history?from=2026-04-10T00:00:00Z&page=0&size=50
-```
-
-### Crash Events
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/crashes/{vehicleId}` | All crash events for a vehicle |
-
-### Example responses
-
-**GET `/api/v1/telemetry/EV-001/latest`**
-
-```json
-{
-  "id": 1024,
-  "vehicleId": "EV-001",
-  "recordedAt": "2026-04-11T14:32:05Z",
-  "batteryVoltage": 48.3,
-  "currentMa": 1200.5,
-  "temperatureC": 42.1,
-  "tirePressureBar": 2.8,
-  "speedKmh": 34.7,
-  "gForce": 9.82
-}
-```
-
-**GET `/api/v1/crashes/EV-001`**
-
-```json
-[
-  {
-    "id": "a1b2c3d4-...",
-    "vehicleId": "EV-001",
-    "latitude": 18.5204,
-    "longitude": 73.8567,
-    "gForcePeak": 15.4,
-    "occurredAt": "2026-04-11T13:01:22Z"
-  }
-]
+mosquitto_pub -h localhost -p 1883 -t "ev/EV-001/telemetry" -f "C:\temp\payload.json"
 ```
 
 ---
 
-## WebSocket
+## Frontend Dashboard — How It Works
 
-The backend pushes every new telemetry reading to connected frontend clients in real time.
+**URL:** `http://localhost:5173/stats`
 
-**STOMP endpoint:** `ws://localhost:8080/ws`
+**On load:**
+1. `GET /api/v1/vehicles` → populates vehicle dropdown, auto-selects first
+2. `GET /api/v1/telemetry/{vin}/history?size=100` → seeds rolling buffer for charts
+3. `GET /api/v1/telemetry/{vin}/latest` → seeds stat cards
+4. `GET /api/v1/crashes/{vin}` → seeds incident map + crash log table
+5. WebSocket connects to `/ws`, subscribes to `/topic/live/{vin}`
 
-**Subscribe to live data:**
+**Live mode (ESP32 online):**
+- Each WS message → appended to rolling 100-entry buffer → charts update
+- Green banner: "Live — charts updating every 500 ms"
 
+**Offline mode (ESP32 offline or WS down):**
+- Yellow banner: "Showing last recorded entry — ESP32 may be offline"
+- Banner shows the exact timestamp of the last DB entry
+- REST poll every 5s → updates stat cards AND appends to chart buffer
+- Data never goes blank — last DB entry persists until fresh data arrives
+
+**Stat card priority (what value is shown):**
 ```
-/topic/live/{vehicleId}
-```
-
-### Frontend usage (JavaScript)
-
-```javascript
-import { Client } from '@stomp/stompjs';
-
-const client = new Client({
-  brokerURL: 'ws://localhost:8080/ws',
-  onConnect: () => {
-    client.subscribe('/topic/live/EV-001', (message) => {
-      const reading = JSON.parse(message.body);
-      console.log('Live reading:', reading);
-      // update your dashboard gauges here
-    });
-  }
-});
-
-client.activate();
+liveReading (WS)  →  latestReading (REST)  →  buffer[last] (history)
 ```
 
-Every time ESP32 publishes a sensor packet, the frontend receives it within milliseconds — no polling required.
+**Vite proxy** (vite.config.js): `/api` and `/ws` proxy to `http://172.23.112.1:8080`
+(172.23.112.1 is the Windows host IP as seen from WSL2 — update if your WSL2 host IP changes).
 
 ---
 
-## Build Phases
+## Sensors & Hardware
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| 1 | Project setup, PostgreSQL, Flyway migrations, JPA entities | 🔲 |
-| 2 | MQTT ingestion — subscribe, parse, persist telemetry | 🔲 |
-| 3 | REST API — telemetry history, vehicles, crash events | 🔲 |
-| 4 | WebSocket — live push to dashboard on each MQTT message | 🔲 |
-| 5 | Crash detection — g-force threshold, CrashEvent creation | 🔲 |
-| 6 | Frontend integration — Antigravity dashboard connects | 🔲 |
+| Sensor | Measures | Field in payload |
+|--------|----------|-----------------|
+| INA219 | Battery voltage (V), current draw (mA) | `batteryVoltage`, `currentMa` |
+| LM35 | Motor/pack temperature (°C) | `temperatureC` |
+| HX710B | Tire pressure (bar) | `tirePressureBar` |
+| Hall Effect | Vehicle speed (km/h) | `speedKmh` |
+| ADXL345 | 3-axis acceleration + resultant g-force | `accelX`, `accelY`, `accelZ`, `gForce` |
+| SIM808 | GPS coordinates for crash geo-tagging | `latitude`, `longitude` |
+
+See `ESP32_INTEGRATION.md` for wiring diagrams and firmware notes.
 
 ---
 
+## Known Decisions & Context
+
+| Decision | Reason |
+|----------|--------|
+| VIN is the external key, UUID is internal | VIN matches MQTT topic and all API paths; UUID never exposed to ESP32 |
+| `ddl-auto: validate` | Flyway owns all schema changes; Hibernate only validates on startup |
+| Auto-register unknown VIN | Simplifies ESP32 firmware — no pre-registration step needed |
+| `getHistory()` returns empty page for unknown VIN | Was throwing 500; fixed to return empty page so frontend handles gracefully |
+| Polling also appends to chart buffer | Was only updating stat cards; fixed so charts also update during offline mode |
+| Mock data fallback in frontend | Charts/map show plausible data if both WS and REST fail completely (demo safety net) |
+| Crash threshold: g-force > 12.0 m/s² | Auto-creates `crash_event` row; plotted on Leaflet map with severity coloring |
+
+---
+
+## Environment File (`.env` — not committed)
+
+```env
+DB_URL=jdbc:postgresql://localhost:5432/evdiag
+DB_USERNAME=evuser
+DB_PASSWORD=evpass
+MQTT_BROKER_URL=tcp://localhost:1883
+```
+
+---
+
+## What Was Built & Working
+
+- [x] ESP32 MQTT → Spring Boot ingestion pipeline
+- [x] PostgreSQL persistence with Flyway migrations
+- [x] Crash auto-detection (g-force threshold) + CrashEvent storage
+- [x] REST API (vehicles, telemetry latest/history, crashes)
+- [x] WebSocket live push via STOMP
+- [x] React dashboard with real-time charts (Chart.js), incident map (Leaflet)
+- [x] Offline fallback — last DB entry shown with yellow banner when ESP32 is offline
+- [x] Chart updates during offline REST polling (not just stat cards)
+
+## What Could Come Next
+
+- [ ] Multi-vehicle simultaneous dashboard view
+- [ ] Email/SMS alert on crash event
+- [ ] Per-wheel tire pressure sensors (currently all 4 wheels show the same value)
+- [ ] Data export (CSV / PDF)
+- [ ] Login / auth for dashboard
+- [ ] Prometheus metrics + Grafana observability

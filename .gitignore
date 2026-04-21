@@ -34,6 +34,9 @@ Thumbs.db
 application-local.yml
 application-local.properties
 
+# ESP32 secrets — WiFi password, Blynk token, phone number
+ev-safety-esp32/secrets.h
+
 # Claude Code / AI tooling — local only, do not push
 .claude/
 CLAUDE.md
@@ -45,3 +48,7 @@ logs/
 
 # Spring Boot devtools restart trigger
 .reloadtrigger
+
+# Frontend — Vite build output and dependencies
+ev-safety-frontend/node_modules/
+ev-safety-frontend/dist/
