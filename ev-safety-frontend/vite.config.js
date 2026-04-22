@@ -1,5 +1,19 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { execSync } from 'child_process';
+
+// Dynamically resolve the Windows host IP for WSL2 environments.
+// Falls back to localhost for native Linux/Mac or mirrored-mode WSL2.
+function getBackendHost() {
+  try {
+    const gateway = execSync("ip route show | grep default | awk '{print $3}'", { encoding: 'utf8' }).trim();
+    if (gateway) return gateway;
+  } catch (_) {}
+  return 'localhost';
+}
+
+const BACKEND_HOST = process.env.BACKEND_HOST || getBackendHost();
+const BACKEND_URL = `http://${BACKEND_HOST}:8080`;
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -14,16 +28,12 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // All /api/* calls forwarded to Spring Boot REST API
-      // Using Windows host IP (172.23.112.1) because Spring Boot runs on Windows,
-      // not inside WSL where the Vite dev server lives.
       '/api': {
-        target: 'http://172.23.112.1:8080',
+        target: BACKEND_URL,
         changeOrigin: true,
       },
-      // WebSocket (SockJS + STOMP) forwarded to Spring Boot /ws
       '/ws': {
-        target: 'http://172.23.112.1:8080',
+        target: BACKEND_URL,
         changeOrigin: true,
         ws: true,
       },

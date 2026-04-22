@@ -213,8 +213,7 @@ mosquitto_pub -h localhost -p 1883 -t "ev/EV-001/telemetry" -f "C:\temp\payload.
 liveReading (WS)  →  latestReading (REST)  →  buffer[last] (history)
 ```
 
-**Vite proxy** (vite.config.js): `/api` and `/ws` proxy to `http://172.23.112.1:8080`
-(172.23.112.1 is the Windows host IP as seen from WSL2 — update if your WSL2 host IP changes).
+**Vite proxy** (vite.config.js): `/api` and `/ws` proxy to the Spring Boot backend. The host is resolved automatically from `ip route` when running inside WSL2, or falls back to `localhost`. Override by setting `BACKEND_HOST` env var before starting the dev server.
 
 ---
 

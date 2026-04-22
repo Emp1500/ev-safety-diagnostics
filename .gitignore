@@ -52,3 +52,7 @@ logs/
 # Frontend — Vite build output and dependencies
 ev-safety-frontend/node_modules/
 ev-safety-frontend/dist/
+
+# Scratch / planning notes
+ev-safety-frontend/a.txt
+ev-safety-frontend/structure.txt

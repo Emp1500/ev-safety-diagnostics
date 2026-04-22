@@ -4,7 +4,7 @@
   Dual publish: Blynk IoT dashboard + MQTT → Spring Boot backend → PostgreSQL
 
   Sensors  : HX710B (tire pressure) | LM35 (temperature) | INA219 (voltage/current)
-             ADXL345 (accelerometer) | Hall sensor (speed) | SIM808 (GPS + SMS)
+             ADXL345 (accelerometer) | KY-024 Hall sensor (speed) | SIM808 (GPS + SMS)
 
   MQTT topic : ev/{VEHICLE_VIN}/telemetry  →  your website live dashboard
   Blynk      : virtual pins V1–V12         →  Blynk mobile/web dashboard
@@ -45,7 +45,7 @@
 // WIFI_SSID, WIFI_PASSWORD, BLYNK_AUTH_TOKEN, ALERT_PHONE → secrets.h (gitignored)
 
 // Laptop LAN IP — run ipconfig (Windows) to confirm before each session
-#define MQTT_BROKER_IP      "10.133.62.199"
+#define MQTT_BROKER_IP      "10.249.211.199"
 #define MQTT_PORT           1883
 #define MQTT_CLIENT_ID      "esp32-ev-001"
 
@@ -61,7 +61,7 @@
 #define HX_DT      4    // HX710B data
 #define HX_SCK     14   // HX710B clock
 #define LM35_PIN   34   // LM35 analog (ADC1)
-#define HALL_PIN   35   // Hall effect sensor (interrupt)
+#define HALL_PIN   35   // KY-024 DO (digital output) — attach to interrupt-capable pin
 // I2C shared bus : SDA=GPIO21, SCL=GPIO22  (INA219 + ADXL345)
 // SIM808 UART    : RX=GPIO16,  TX=GPIO17
 
@@ -97,11 +97,19 @@ Adafruit_INA219 ina219;
 // --- ADXL345 ---
 Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);
 
-// --- Hall sensor ---
-volatile int  hallPulses  = 0;
-unsigned long lastSpeedMs = 0;
-float         wheelRadius = 0.3f;   // meters — measure your actual wheel
-float         speedKmh    = 0.0f;
+// --- KY-024 Hall sensor speed calibration ---
+// KY-024 DO goes LOW each time the magnet passes the sensor face.
+// Tune these two values to match your physical setup:
+#define MAGNETS_PER_REV   1        // number of magnets glued to the wheel rim
+#define WHEEL_RADIUS_M    0.30f    // wheel radius in metres (measure your actual wheel)
+// Debounce: KY-024 DO can glitch when the magnet edge exits the field.
+// 5 ms is safe up to ~30 rev/s (> 200 km/h on a 0.3 m wheel).
+#define HALL_DEBOUNCE_US  5000UL
+
+volatile int           hallPulses   = 0;
+volatile unsigned long lastPulseUs  = 0;
+unsigned long          lastSpeedMs  = 0;
+float                  speedKmh     = 0.0f;
 
 // --- SIM808 GPS ---
 HardwareSerial sim808(1);
@@ -115,7 +123,13 @@ bool crashPublishPending = false;
 // ================================================================
 //  INTERRUPT
 // ================================================================
-void IRAM_ATTR onHallPulse() { hallPulses++; }
+void IRAM_ATTR onHallPulse() {
+  unsigned long now = micros();
+  if (now - lastPulseUs >= HALL_DEBOUNCE_US) {
+    hallPulses++;
+    lastPulseUs = now;
+  }
+}
 
 // ================================================================
 //  SETUP
@@ -128,8 +142,10 @@ void setup() {
   pinMode(HX_DT,  INPUT);
   pinMode(HX_SCK, OUTPUT);
 
-  // Hall sensor
-  pinMode(HALL_PIN, INPUT);
+  // KY-024 Hall sensor — DO is active-LOW (drops when magnet present)
+  // INPUT_PULLUP adds ESP32's internal pull-up on top of KY-024's onboard resistor
+  // for extra noise immunity, especially on long wire runs.
+  pinMode(HALL_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(HALL_PIN), onHallPulse, FALLING);
   lastSpeedMs = millis();
 
@@ -307,9 +323,16 @@ void updateSpeed() {
   if (millis() - lastSpeedMs >= 1000) {
     noInterrupts();
     int pulses = hallPulses;
-    hallPulses = 0;
+    hallPulses  = 0;
     interrupts();
-    speedKmh    = pulses * (2.0f * 3.14159f * wheelRadius) * 3.6f;
+
+    if (pulses == 0) {
+      speedKmh = 0.0f;
+    } else {
+      // revolutions per second = pulses / magnets_per_rev (1 s window)
+      float rps = (float)pulses / MAGNETS_PER_REV;
+      speedKmh  = rps * (2.0f * 3.14159f * WHEEL_RADIUS_M) * 3.6f;
+    }
     lastSpeedMs = millis();
   }
 }
