@@ -30,3 +30,23 @@ server:
 websocket:
   endpoint: /ws
   topic-prefix: /topic/live
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    display-request-duration: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    org.springframework.web.socket.config.annotation.WebSocketMessageBrokerStats: WARN
